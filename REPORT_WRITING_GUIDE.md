@@ -314,12 +314,13 @@ This runs all analyses including the new sensitivity analyses, residual diagnost
 
 ## KEY EQUATIONS
 
-**BLR with Hyperprior:**
+**BLR with Intercept and Hyperprior:**
 ```
+alpha ~ Normal(y_mean, 20)
 tau ~ HalfNormal(10)
 beta | tau ~ Normal(0, tau^2 * I)
 sigma ~ HalfNormal(10)
-y | X, beta, sigma ~ Normal(X*beta, sigma^2)
+y | X, alpha, beta, sigma ~ Normal(alpha + X*beta, sigma^2)
 ```
 
 **GP Kernel:**
@@ -349,4 +350,4 @@ P(strength >= s_min) = (1/N) * sum_i I(y_pred_i >= s_min)
 
 ---
 
-*Updated to include sensitivity analyses, trust region, and residual diagnostics based on project feedback.*
+*Updated to include sensitivity analyses, trust region, residual diagnostics, corrected BLR model with intercept, and actual validation metrics.*
