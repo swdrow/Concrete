@@ -109,15 +109,18 @@ Your report should follow the 8-step pipeline. Below is guidance for each sectio
 
 ### Bayesian Linear Regression
 
-**Model with hyperprior (updated based on feedback):**
+**Model with intercept and hyperprior:**
 ```
+alpha ~ Normal(y_mean, 20)     # Intercept centered at data mean
 tau ~ HalfNormal(10)           # Hyperprior on shrinkage
 beta | tau ~ Normal(0, tau^2)  # Coefficients depend on tau
 sigma ~ HalfNormal(10)         # Noise std
-y | X, beta, sigma ~ Normal(X*beta, sigma^2)
+y | X, alpha, beta, sigma ~ Normal(alpha + X*beta, sigma^2)
 ```
 
-Why the hyperprior on tau? It lets the data inform how much shrinkage is appropriate, rather than fixing it arbitrarily.
+The intercept (alpha) is centered at the training data mean (~35.8 MPa) since features are standardized to mean zero. Without this intercept, predictions would center around zero instead of the true strength range.
+
+The hyperprior on tau lets the data inform how much shrinkage is appropriate, rather than fixing it arbitrarily.
 
 ### Gaussian Process Regression
 
@@ -162,9 +165,11 @@ Report how the posterior changes with prior scale. If results are similar across
 ### Metrics
 | Metric | BLR | GP |
 |--------|-----|-----|
-| RMSE | [value] | [value] |
-| MAE | [value] | [value] |
-| R-squared | [value] | [value] |
+| RMSE | 6.49 MPa | 5.28 MPa |
+| MAE | 5.25 MPa | 3.73 MPa |
+| R-squared | 0.836 | 0.892 |
+
+The GP outperforms BLR across all metrics, which makes sense given its ability to capture nonlinear relationships. However, both models provide useful uncertainty estimates for decision-making.
 
 ### Calibration
 Check if X% intervals contain X% of observations.
