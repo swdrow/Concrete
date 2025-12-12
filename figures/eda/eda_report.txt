@@ -1,0 +1,49 @@
+
+================================================================================
+EXPLORATORY DATA ANALYSIS - KEY TAKEAWAYS
+================================================================================
+
+1. FEATURE CORRELATIONS WITH COMPRESSIVE STRENGTH:
+   - cement: +0.498
+   - superplasticizer: +0.366
+   - age: +0.329
+   - blast_furnace_slag: +0.135
+   - fly_ash: -0.106
+   - coarse_aggregate: -0.165
+   - fine_aggregate: -0.167
+   - water: -0.290
+
+   Strongest positive correlation: cement (0.498)
+   Strongest negative correlation: water (-0.290)
+
+2. AGE TRANSFORMATION:
+   - Original age correlation: 0.329
+   - Log(age) correlation: 0.549
+   - Log transformation improves correlation by 0.221
+   → Recommendation: Use log(age) as feature
+
+3. DATA QUALITY:
+   - Missing values: 0 (Perfect!)
+
+4. OUTLIERS:
+   - blast_furnace_slag: 2 outliers (0.2%)
+   - water: 9 outliers (0.9%)
+   - superplasticizer: 10 outliers (1.0%)
+   - fine_aggregate: 5 outliers (0.5%)
+   - age: 59 outliers (5.7%)
+   - compressive_strength: 4 outliers (0.4%)
+
+5. TARGET VARIABLE (Compressive Strength):
+   - Range: 2.33 - 82.60 MPa
+   - Mean: 35.82 MPa
+   - Std: 16.71 MPa
+   - Skewness: 0.417
+
+6. KEY INSIGHTS FOR MODELING:
+   - Cement content shows strongest positive correlation with strength
+   - Water has negative correlation (higher water/cement ratio → lower strength)
+   - Age effect is non-linear; log transformation recommended
+   - No missing values; minimal preprocessing needed
+   - Wide range of mixture compositions allows for diverse predictions
+
+================================================================================
