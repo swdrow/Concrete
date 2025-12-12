@@ -38,24 +38,27 @@ def predict_blr(trace, X_test, n_samples=None):
         n_samples = config.VALIDATION_CONFIG['n_posterior_samples']
 
     # Extract posterior samples
+    alpha_samples = trace.posterior['alpha'].values  # Intercept
     beta_samples = trace.posterior['beta'].values
     sigma_samples = trace.posterior['sigma'].values
 
     # Reshape to (n_total_samples, n_features)
     n_chains, n_draws, n_features = beta_samples.shape
+    alpha_samples = alpha_samples.flatten()
     beta_samples = beta_samples.reshape(-1, n_features)
     sigma_samples = sigma_samples.flatten()
 
     # Randomly select samples if needed
     if n_samples < len(beta_samples):
         idx = np.random.choice(len(beta_samples), size=n_samples, replace=False)
+        alpha_samples = alpha_samples[idx]
         beta_samples = beta_samples[idx]
         sigma_samples = sigma_samples[idx]
 
-    # Generate predictions: y = X @ beta + noise
+    # Generate predictions: y = alpha + X @ beta + noise
     y_pred_samples = []
-    for beta, sigma in zip(beta_samples, sigma_samples):
-        y_mean = X @ beta
+    for alpha, beta, sigma in zip(alpha_samples, beta_samples, sigma_samples):
+        y_mean = alpha + X @ beta  # Include intercept!
         y_sample = y_mean + np.random.randn(len(X)) * sigma
         y_pred_samples.append(y_sample)
 

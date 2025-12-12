@@ -18,17 +18,19 @@ def build_blr_model(X_train, y_train, prior_beta_std=None, use_hyperprior=None):
     Build Bayesian Linear Regression model using PyMC
 
     Model specification (without hyperprior):
-        y = Xβ + ε
+        y = α + Xβ + ε
+        α ~ Normal(μ_y, 20)             # Intercept centered near data mean
         β ~ Normal(0, σ_β²)
         σ ~ HalfNormal(σ_prior)
-        y | X, β, σ ~ Normal(Xβ, σ²)
+        y | X, α, β, σ ~ Normal(α + Xβ, σ²)
 
     Model specification (with hyperprior on τ):
-        y = Xβ + ε
+        y = α + Xβ + ε
+        α ~ Normal(μ_y, 20)             # Intercept centered near data mean
         τ ~ HalfNormal(τ_prior)         # Hyperprior on shrinkage
         β | τ ~ Normal(0, τ²)           # Coefficients depend on τ
         σ ~ HalfNormal(σ_prior)
-        y | X, β, σ ~ Normal(Xβ, σ²)
+        y | X, α, β, σ ~ Normal(α + Xβ, σ²)
 
     Parameters:
     -----------
@@ -72,7 +74,13 @@ def build_blr_model(X_train, y_train, prior_beta_std=None, use_hyperprior=None):
         print(f"  Number of samples: {len(y)}")
         print(f"  Using hyperprior on τ: {use_hyperprior}")
 
+    # Compute y mean for intercept prior
+    y_mean = float(np.mean(y))
+
     with pm.Model() as model:
+        # Intercept prior - centered near the data mean
+        alpha = pm.Normal('alpha', mu=y_mean, sigma=20.0)
+
         if use_hyperprior:
             # Hyperprior on tau (global shrinkage)
             tau = pm.HalfNormal('tau',
@@ -94,8 +102,8 @@ def build_blr_model(X_train, y_train, prior_beta_std=None, use_hyperprior=None):
         sigma = pm.HalfNormal('sigma',
                               sigma=config.BLR_CONFIG['prior_sigma_std'])
 
-        # Linear model
-        mu = pm.math.dot(X, beta)
+        # Linear model WITH INTERCEPT
+        mu = alpha + pm.math.dot(X, beta)
 
         # Likelihood
         y_obs = pm.Normal('y_obs',
@@ -105,13 +113,14 @@ def build_blr_model(X_train, y_train, prior_beta_std=None, use_hyperprior=None):
 
         if config.VERBOSE:
             print("\nModel specification:")
+            print(f"  Prior on α (intercept): Normal({y_mean:.2f}, 20)")
             if use_hyperprior:
                 print(f"  Hyperprior on τ: HalfNormal({config.BLR_CONFIG.get('tau_prior_std', 10.0)})")
                 print(f"  Prior on β | τ: Normal(0, τ²)")
             else:
                 print(f"  Prior on β: Normal(0, {prior_beta_std}²)")
             print(f"  Prior on σ: HalfNormal({config.BLR_CONFIG['prior_sigma_std']})")
-            print(f"  Likelihood: y ~ Normal(Xβ, σ²)")
+            print(f"  Likelihood: y ~ Normal(α + Xβ, σ²)")
 
     return model, feature_names
 
@@ -185,15 +194,19 @@ def check_convergence(trace, feature_names):
     rhat = az.rhat(trace)
     rhat_beta = rhat['beta'].values
     rhat_sigma = rhat['sigma'].values
+    rhat_alpha = rhat['alpha'].values
 
     # Effective sample size
     ess = az.ess(trace)
     ess_beta = ess['beta'].values
     ess_sigma = ess['sigma'].values
+    ess_alpha = ess['alpha'].values
 
     diagnostics = {
+        'rhat_alpha': rhat_alpha,
         'rhat_beta': rhat_beta,
         'rhat_sigma': rhat_sigma,
+        'ess_alpha': ess_alpha,
         'ess_beta': ess_beta,
         'ess_sigma': ess_sigma
     }
@@ -208,6 +221,7 @@ def check_convergence(trace, feature_names):
 
     if config.VERBOSE:
         print("\nR-hat (should be < 1.01):")
+        print(f"  α (intercept): {rhat_alpha:.4f}")
         print(f"  σ: {rhat_sigma:.4f}")
         if has_tau:
             print(f"  τ: {rhat_tau:.4f}")
@@ -215,6 +229,7 @@ def check_convergence(trace, feature_names):
             print(f"  β[{name}]: {rhat_beta[i]:.4f}")
 
         print("\nEffective Sample Size (should be > 400):")
+        print(f"  α (intercept): {ess_alpha:.0f}")
         print(f"  σ: {ess_sigma:.0f}")
         if has_tau:
             print(f"  τ: {ess_tau:.0f}")
@@ -222,8 +237,8 @@ def check_convergence(trace, feature_names):
             print(f"  β[{name}]: {ess_beta[i]:.0f}")
 
         # Check if any issues
-        rhat_issues = (rhat_beta > 1.01).sum() + (rhat_sigma > 1.01)
-        ess_issues = (ess_beta < 400).sum() + (ess_sigma < 400)
+        rhat_issues = (rhat_beta > 1.01).sum() + (rhat_sigma > 1.01) + (rhat_alpha > 1.01)
+        ess_issues = (ess_beta < 400).sum() + (ess_sigma < 400) + (ess_alpha < 400)
         if has_tau:
             rhat_issues += (rhat_tau > 1.01)
             ess_issues += (ess_tau < 400)
@@ -255,9 +270,9 @@ def plot_trace(trace, feature_names, save=True):
     save : bool
         Whether to save the figure
     """
-    # Use arviz's built-in plotting with all variables
-    az.plot_trace(trace, var_names=['beta', 'sigma'],
-                  figsize=(15, max(10, len(feature_names) * 1.5)),
+    # Use arviz's built-in plotting with all variables (including alpha intercept)
+    az.plot_trace(trace, var_names=['alpha', 'beta', 'sigma'],
+                  figsize=(15, max(12, (len(feature_names) + 2) * 1.5)),
                   show=False)
 
     plt.suptitle('MCMC Trace Plots - Bayesian Linear Regression',
@@ -360,7 +375,7 @@ def get_posterior_summary(trace, feature_names):
     --------
     pd.DataFrame : Summary statistics
     """
-    summary = az.summary(trace, var_names=['beta', 'sigma'])
+    summary = az.summary(trace, var_names=['alpha', 'beta', 'sigma'])
 
     # Add feature names to beta coefficients
     beta_idx = summary.index.str.startswith('beta')

@@ -104,7 +104,7 @@ GP_CONFIG = {
     "kernel_type": "RBF",        # RBF (Radial Basis Function) kernel
     "use_ard": True,             # Automatic Relevance Determination
     "n_restarts_optimizer": 10,  # Number of random restarts for optimization
-    "alpha": 1e-10,              # Noise regularization
+    "alpha": 0.1,                # Noise regularization (variance of observation noise)
     "random_seed": RANDOM_SEED
 }
 
